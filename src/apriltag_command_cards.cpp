@@ -35,10 +35,13 @@ int main(int argc, char **argv) {
     ros::Publisher command_pub, visibility_pub, direction_pub;
   };
   static std::vector<CommandCard> command_cards;
-  static double timeout = 1.5;
+  static double timeout = 1;
   {
     ROS_INFO("command card description file %s", argv[1]);
     YAML::Node yaml = YAML::LoadFile(argv[1]);
+    if (auto p = yaml["timeout"]) {
+      timeout = p.as<double>();
+    }
     YAML::Node command_yaml = yaml["command_cards"];
     for (YAML::const_iterator it = command_yaml.begin();
          it != command_yaml.end(); ++it) {
@@ -100,26 +103,28 @@ int main(int argc, char **argv) {
                 tag_detector->extractTags(gray);
             // ROS_INFO("%d tags detected", (int)detections.size());
 
+            auto putText = [&](const std::string &text, int x, int y,
+                               const cv::Scalar &color) {
+              cv::putText(cv_ptr->image, text, cv::Point(x, y),
+                          CV_FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 0), 8,
+                          cv::LINE_AA);
+              cv::putText(cv_ptr->image, text, cv::Point(x, y),
+                          CV_FONT_HERSHEY_SIMPLEX, 1.0, color, 2, cv::LINE_AA);
+            };
+
             for (auto &detection : detections) {
               detection.draw(cv_ptr->image);
               for (auto &command_card : command_cards) {
                 if (command_card.id == detection.id) {
-                  cv::putText(
-                      cv_ptr->image, command_card.name,
-                      cv::Point(detection.cxy.first, detection.cxy.second - 20),
-                      CV_FONT_HERSHEY_SIMPLEX, 1.0,
-                      command_card.inhibition ? cv::Scalar(0, 0, 255)
-                                              : cv::Scalar(0, 255, 0),
-                      2, cv::LINE_AA);
-                  cv::putText(
-                      cv_ptr->image,
-                      std::to_string((int)std::round(command_card.counter *
-                                                     100 / timeout)),
-                      cv::Point(detection.cxy.first, detection.cxy.second + 40),
-                      CV_FONT_HERSHEY_SIMPLEX, 1.0,
-                      command_card.inhibition ? cv::Scalar(0, 0, 255)
-                                              : cv::Scalar(0, 255, 0),
-                      2, cv::LINE_AA);
+                  putText(command_card.name, detection.cxy.first,
+                          detection.cxy.second - 20,
+                          command_card.inhibition ? cv::Scalar(0, 0, 255)
+                                                  : cv::Scalar(0, 255, 0));
+                  putText(std::to_string((int)std::round(command_card.counter *
+                                                         100 / timeout)),
+                          detection.cxy.first, detection.cxy.second + 40,
+                          command_card.inhibition ? cv::Scalar(0, 0, 255)
+                                                  : cv::Scalar(0, 255, 0));
                 }
               }
             }
@@ -129,6 +134,9 @@ int main(int argc, char **argv) {
             double px = camera->P[2];
             double py = camera->P[6];
             // ROS_INFO("%f %f %f %f", fx, fy, px, py);
+
+            static std::string command_vis_text;
+            static ros::Time command_vis_time;
 
             for (auto &command_card : command_cards) {
 
@@ -166,11 +174,8 @@ int main(int argc, char **argv) {
                       std_msgs::Empty msg;
                       command_card.command_pub.publish(msg);
                     }
-                    {
-                      cv::putText(cv_ptr->image, command_card.name,
-                                  cv::Point(20, 60), CV_FONT_HERSHEY_SIMPLEX,
-                                  1.0, cv::Scalar(255, 0, 255), 2, cv::LINE_AA);
-                    }
+                    command_vis_text = command_card.name;
+                    command_vis_time = current_time;
                   }
                 }
               } else {
@@ -193,6 +198,16 @@ int main(int argc, char **argv) {
                 msg.y = y;
                 msg.z = z;
                 command_card.direction_pub.publish(msg);
+              }
+            }
+
+            if (!command_vis_text.empty()) {
+              putText(command_vis_text, 20, 60,
+                      current_time == command_vis_time
+                          ? cv::Scalar(0, 255, 255)
+                          : cv::Scalar(255, 0, 255));
+              if ((current_time - command_vis_time).toSec() > 1) {
+                command_vis_text.clear();
               }
             }
 

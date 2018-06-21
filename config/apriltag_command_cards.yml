@@ -1,3 +1,4 @@
+timeout: 1
 command_cards:
   403: command-pause
   404: command-continue
