@@ -1,7 +1,10 @@
 #include <ros/ros.h>
 
 #include <cv_bridge/cv_bridge.h>
+#include <geometry_msgs/Vector3.h>
 #include <image_transport/image_transport.h>
+#include <std_msgs/Bool.h>
+#include <std_msgs/Empty.h>
 #include <std_msgs/String.h>
 
 #include <AprilTags/TagDetector.h>
@@ -22,11 +25,14 @@ int main(int argc, char **argv) {
   ros::init(argc, argv, "apriltag_command_cards",
             ros::init_options::NoSigintHandler);
 
+  static ros::NodeHandle node;
+
   struct CommandCard {
     int id = 0;
     std::string name;
     double counter = 0.0;
     bool inhibition = true;
+    ros::Publisher command_pub, visibility_pub, direction_pub;
   };
   static std::vector<CommandCard> command_cards;
   static double timeout = 1.5;
@@ -39,19 +45,29 @@ int main(int argc, char **argv) {
       CommandCard command_card;
       command_card.id = it->first.as<int>();
       command_card.name = it->second.as<std::string>();
+      std::string topic_name = command_card.name;
+      for (auto &c : topic_name) {
+        if (!std::isalnum(c)) {
+          c = '_';
+        }
+      }
+      command_card.command_pub = node.advertise<std_msgs::Empty>(
+          "/command_cards/cards/" + topic_name + "/command", 1);
+      command_card.visibility_pub = node.advertise<std_msgs::Bool>(
+          "/command_cards/cards/" + topic_name + "/visible", 1);
+      command_card.direction_pub = node.advertise<geometry_msgs::Vector3>(
+          "/command_cards/cards/" + topic_name + "/direction", 1);
       command_cards.push_back(command_card);
     }
   }
 
-  static ros::NodeHandle node;
-
   static ros::Publisher command_pub =
-      node.advertise<std_msgs::String>("command_cards", 1);
+      node.advertise<std_msgs::String>("/command_cards/commands", 1);
 
   static image_transport::ImageTransport image_transport(node);
 
   static image_transport::Publisher image_pub =
-      image_transport.advertise("command_card_detections", 1);
+      image_transport.advertise("/command_cards/image", 1);
 
   auto *tag_codes = &AprilTags::tagCodes36h11;
   static auto tag_detector =
@@ -65,7 +81,7 @@ int main(int argc, char **argv) {
                     const sensor_msgs::CameraInfoConstPtr &))[](
               const sensor_msgs::ImageConstPtr &msg,
               const sensor_msgs::CameraInfoConstPtr &camera) {
-            ROS_INFO("image");
+            // ROS_INFO("image");
             ros::Time current_time = ros::Time::now();
             double delta_time = (current_time - last_time).toSec();
             last_time = current_time;
@@ -82,7 +98,7 @@ int main(int argc, char **argv) {
 
             std::vector<AprilTags::TagDetection> detections =
                 tag_detector->extractTags(gray);
-            ROS_INFO("%d tags detected", (int)detections.size());
+            // ROS_INFO("%d tags detected", (int)detections.size());
 
             for (auto &detection : detections) {
               detection.draw(cv_ptr->image);
@@ -101,12 +117,28 @@ int main(int argc, char **argv) {
               }
             }
 
+            double fx = camera->P[0];
+            double fy = camera->P[5];
+            double px = camera->P[2];
+            double py = camera->P[6];
+            // ROS_INFO("%f %f %f %f", fx, fy, px, py);
+
             for (auto &command_card : command_cards) {
 
               bool match = false;
+              double x = 0;
+              double y = 0;
+              double z = 0;
               for (auto &detection : detections) {
                 if (detection.id == command_card.id) {
                   match = true;
+                  x = +((detection.cxy.first - px) / fx);
+                  y = -((detection.cxy.second - py) / fy);
+                  z = 1;
+                  double f = 1.0 / (x * x + y * y + z * z);
+                  x *= f;
+                  y *= f;
+                  z *= f;
                 }
               }
 
@@ -118,9 +150,15 @@ int main(int argc, char **argv) {
                     command_card.inhibition = true;
                     ROS_INFO("command %i %s", command_card.id,
                              command_card.name.c_str());
-                    std_msgs::String msg;
-                    msg.data = command_card.name;
-                    command_pub.publish(msg);
+                    {
+                      std_msgs::String msg;
+                      msg.data = command_card.name;
+                      command_pub.publish(msg);
+                    }
+                    {
+                      std_msgs::Empty msg;
+                      command_card.command_pub.publish(msg);
+                    }
                   }
                 }
               } else {
@@ -129,6 +167,20 @@ int main(int argc, char **argv) {
                   command_card.counter = 0;
                   command_card.inhibition = false;
                 }
+              }
+
+              {
+                std_msgs::Bool msg;
+                msg.data = match;
+                command_card.visibility_pub.publish(msg);
+              }
+
+              {
+                geometry_msgs::Vector3 msg;
+                msg.x = x;
+                msg.y = y;
+                msg.z = z;
+                command_card.direction_pub.publish(msg);
               }
             }
 
