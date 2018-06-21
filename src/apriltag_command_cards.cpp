@@ -105,11 +105,18 @@ int main(int argc, char **argv) {
               for (auto &command_card : command_cards) {
                 if (command_card.id == detection.id) {
                   cv::putText(
+                      cv_ptr->image, command_card.name,
+                      cv::Point(detection.cxy.first, detection.cxy.second - 20),
+                      CV_FONT_HERSHEY_SIMPLEX, 1.0,
+                      command_card.inhibition ? cv::Scalar(0, 0, 255)
+                                              : cv::Scalar(0, 255, 0),
+                      2, cv::LINE_AA);
+                  cv::putText(
                       cv_ptr->image,
                       std::to_string((int)std::round(command_card.counter *
                                                      100 / timeout)),
-                      cv::Point(detection.cxy.first, detection.cxy.second),
-                      CV_FONT_HERSHEY_SIMPLEX, 0.8,
+                      cv::Point(detection.cxy.first, detection.cxy.second + 40),
+                      CV_FONT_HERSHEY_SIMPLEX, 1.0,
                       command_card.inhibition ? cv::Scalar(0, 0, 255)
                                               : cv::Scalar(0, 255, 0),
                       2, cv::LINE_AA);
@@ -158,6 +165,11 @@ int main(int argc, char **argv) {
                     {
                       std_msgs::Empty msg;
                       command_card.command_pub.publish(msg);
+                    }
+                    {
+                      cv::putText(cv_ptr->image, command_card.name,
+                                  cv::Point(20, 60), CV_FONT_HERSHEY_SIMPLEX,
+                                  1.0, cv::Scalar(255, 0, 255), 2, cv::LINE_AA);
                     }
                   }
                 }
