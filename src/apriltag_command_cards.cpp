@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
   static ros::Time last_time = ros::Time::now();
   static image_transport::CameraSubscriber image_sub =
       image_transport.subscribeCamera(
-          "/camera/rgb/image_rect_color", 1,
+          "image", 1,
           (void (*)(const sensor_msgs::ImageConstPtr &,
                     const sensor_msgs::CameraInfoConstPtr &))[](
               const sensor_msgs::ImageConstPtr &msg,

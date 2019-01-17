@@ -5,7 +5,8 @@
     type="apriltag_command_cards"
     name="apriltag_command_cards"
     args="$(find apriltag_command_cards)/config/apriltag_command_cards.yml"
-    output="screen"
-    />
+    output="screen">
+    <remap from="image" to="camera/rgb/image_rect_color" />
+  </node>
 
 </launch>
