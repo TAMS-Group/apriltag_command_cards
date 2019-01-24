@@ -1,7 +1,8 @@
 timeout: 1
 command_cards:
   400: test
-  402: command-start
+  401: command-start
+  402: command-stop
   403: command-pause
   404: command-continue
   405: command-cancel-active-task
