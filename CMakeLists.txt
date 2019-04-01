@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.0)
+
 project(apriltag_command_cards)
 
 set(CMAKE_CXX_FLAGS "-std=c++11")
