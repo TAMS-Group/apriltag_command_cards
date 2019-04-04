@@ -1,5 +1,6 @@
 timeout: 1
 command_cards:
+  399: command-reset
   400: test
   401: command-start
   402: command-stop
@@ -27,6 +28,7 @@ command_cards:
   427: drive-follow-user
   430: order-glass-of-still-water
   431: order-glass-of-sparkling-water
+  432: order-glass-of-ginger-ale
   433: order-glass-of-tonic-water
   434: order-glass-of-bitter-lemon
   435: order-glass-of-bitter-orange
