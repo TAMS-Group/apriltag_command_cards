@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_ros_robot_interaction
   sensor_msgs
   cv_bridge
+  image_transport
   apriltags
 )
 
